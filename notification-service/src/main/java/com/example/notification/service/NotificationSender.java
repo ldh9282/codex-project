@@ -13,6 +13,7 @@ public class NotificationSender {
 
     public void sendOrderConfirmation(OrderCreatedEvent event) {
         if (event.customerId().startsWith("fail-")) {
+            log.error("Simulating downstream failure for customerId={}", event.customerId());
             throw new IllegalStateException("Simulated downstream failure for customerId=" + event.customerId());
         }
 

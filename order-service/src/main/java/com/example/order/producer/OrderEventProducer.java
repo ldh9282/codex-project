@@ -43,6 +43,10 @@ public class OrderEventProducer {
         CompletableFuture<SendResult<String, Object>> future;
         try {
             future = kafkaTemplate.send(topic, key, event);
+        // key를 orderId로 지정하면 같은 주문 이벤트는 동일 파티션에 기록되어 순서를 보장하기 쉽다.
+        CompletableFuture<SendResult<String, OrderCreatedEvent>> future;
+        try {
+            future = kafkaTemplate.send(orderTopic, event.orderId(), event);
         } catch (Exception exception) {
             throw new EventPublishException("Order event publish failed. Verify Kafka bootstrap server/topic availability.", exception);
         }

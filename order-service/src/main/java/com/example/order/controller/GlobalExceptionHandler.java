@@ -1,7 +1,6 @@
 package com.example.order.controller;
 
 import com.example.order.exception.EventPublishException;
-import com.example.order.exception.InvalidOrderStatusTransitionException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -24,17 +23,6 @@ public class GlobalExceptionHandler {
         body.put("details", exception.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .toList());
-        return ResponseEntity.badRequest().body(body);
-    }
-
-
-    @ExceptionHandler(InvalidOrderStatusTransitionException.class)
-    public ResponseEntity<Map<String, Object>> handleInvalidStatus(InvalidOrderStatusTransitionException exception) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", Instant.now());
-        body.put("status", HttpStatus.BAD_REQUEST.value());
-        body.put("error", "Invalid order status transition");
-        body.put("message", exception.getMessage());
         return ResponseEntity.badRequest().body(body);
     }
 
