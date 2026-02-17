@@ -1,6 +1,7 @@
 package com.example.order.producer;
 
 import com.example.common.event.OrderCreatedEvent;
+import com.example.order.exception.EventPublishException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,7 +29,13 @@ public class OrderEventProducer {
 
     public void sendOrderCreated(OrderCreatedEvent event) {
         // key를 orderId로 지정하면 같은 주문 이벤트는 동일 파티션에 기록되어 순서를 보장하기 쉽다.
-        CompletableFuture<SendResult<String, OrderCreatedEvent>> future = kafkaTemplate.send(orderTopic, event.orderId(), event);
+        CompletableFuture<SendResult<String, OrderCreatedEvent>> future;
+        try {
+            future = kafkaTemplate.send(orderTopic, event.orderId(), event);
+        } catch (Exception exception) {
+            throw new EventPublishException("Order event publish failed. Verify Kafka bootstrap server/topic availability.", exception);
+        }
+
         future.whenComplete((result, throwable) -> {
             if (throwable != null) {
                 log.error("Failed to publish order event. orderId={}, eventId={}", event.orderId(), event.eventId(), throwable);
