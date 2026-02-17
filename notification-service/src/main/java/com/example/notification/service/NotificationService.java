@@ -31,7 +31,13 @@ public class NotificationService {
             return new NotificationResult(event.eventId(), event.orderId(), NotificationStatus.DUPLICATE, Instant.now(), "Already processed");
         }
 
-        notificationSender.sendOrderConfirmation(event);
-        return new NotificationResult(event.eventId(), event.orderId(), NotificationStatus.SENT, Instant.now(), "Notification sent");
+        try {
+            notificationSender.sendOrderConfirmation(event);
+            return new NotificationResult(event.eventId(), event.orderId(), NotificationStatus.SENT, Instant.now(), "Notification sent");
+        } catch (RuntimeException exception) {
+            // 처리 실패 시 예약 키를 해제해 Kafka 재시도/재처리에서 정상 재실행될 수 있게 한다.
+            processedEventRepository.releaseReservation(event.eventId());
+            throw exception;
+        }
     }
 }

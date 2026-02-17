@@ -22,4 +22,8 @@ public class ProcessedEventRepository {
         Boolean success = redisTemplate.opsForValue().setIfAbsent(KEY_PREFIX + eventId, "1", TTL);
         return Boolean.TRUE.equals(success);
     }
+
+    public void releaseReservation(String eventId) {
+        redisTemplate.delete(KEY_PREFIX + eventId);
+    }
 }
