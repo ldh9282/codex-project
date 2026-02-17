@@ -1,11 +1,11 @@
-# Kafka Event-Driven MSA Portfolio (Order → Notification)
+# Kafka Event-Driven MSA Portfolio (Order/Product → Notification)
 
 실무형 설계를 목표로 만든 Spring Boot 기반 Kafka 이벤트 드리븐 프로젝트입니다.
 
 ## 1) 프로젝트 개요
 
-이 프로젝트는 `order-service`에서 주문 생성 API를 호출하면 `OrderCreatedEvent`를 Kafka로 발행하고,
-`notification-service`가 해당 이벤트를 소비하여 알림을 전송하는 구조입니다.
+이 프로젝트는 `order-service`와 `product-service`에서 각각 주문/상품 생성 이벤트를 Kafka로 발행하고,
+`notification-service`가 주문 생성 이벤트를 소비하여 알림을 전송하는 구조입니다.
 
 핵심 포인트:
 - Producer/Consumer 분리 (서비스 책임 분리)
@@ -25,7 +25,7 @@
    v
 [order-service]
    | 1) 주문 생성
-   | 2) OrderCreatedEvent 발행 (topic: order.created.v1)
+   | 2) OrderCreatedEvent / OrderShippedEvent 발행 (topic: order.created.v1)
    v
 [Kafka Broker]  --- partition(0..2)
    |
@@ -55,6 +55,8 @@ kafka-msa-portfolio/
 │  ├─ pom.xml
 │  └─ src/main/java/com/example/common/
 │     ├─ event/OrderCreatedEvent.java
+│     ├─ event/OrderShippedEvent.java
+│     ├─ event/ProductCreatedEvent.java
 │     └─ serde/KafkaEventSerDe.java
 ├─ order-service/
 │  ├─ pom.xml
@@ -68,6 +70,19 @@ kafka-msa-portfolio/
 │     │  ├─ dto/CreateOrderResponse.java
 │     │  ├─ producer/OrderEventProducer.java
 │     │  └─ service/OrderService.java
+│     └─ resources/application.yml
+├─ product-service/
+│  ├─ pom.xml
+│  └─ src/main/
+│     ├─ java/com/example/product/
+│     │  ├─ ProductServiceApplication.java
+│     │  ├─ config/KafkaProducerConfig.java
+│     │  ├─ controller/ProductController.java
+│     │  ├─ controller/GlobalExceptionHandler.java
+│     │  ├─ dto/CreateProductRequest.java
+│     │  ├─ dto/CreateProductResponse.java
+│     │  ├─ producer/ProductEventProducer.java
+│     │  └─ service/ProductService.java
 │     └─ resources/application.yml
 └─ notification-service/
    ├─ pom.xml
@@ -109,7 +124,7 @@ kafka-msa-portfolio/
 - 일시적 장애(외부 API timeout 등)에서 자동 회복 기회를 제공.
 
 ### DLQ
-- 재시도 후 실패한 메시지는 `order.created.v1.dlq` 토픽으로 이동.
+- 재시도 후 실패한 메시지는 `order.created.v1.dlq` (주문생성), `order.shipped.v1.dlq` (주문배송), `product.created.v1.dlq` (상품) 토픽으로 이동.
 - DLQ 컨슈머에서 장애 메시지 로깅 후 운영 알람/재처리 시스템으로 연결 가능.
 
 ### 왜 필요한가?
@@ -148,6 +163,9 @@ mvn clean package
 mvn -pl order-service spring-boot:run
 
 # 터미널 2
+mvn -pl product-service spring-boot:run
+
+# 터미널 3
 mvn -pl notification-service spring-boot:run
 ```
 
@@ -163,7 +181,32 @@ curl -X POST http://localhost:8081/api/orders \
   }'
 ```
 
-### 7.5 DLQ 테스트 (강제 실패)
+### 7.5 주문 상태 변경 API 호출
+```bash
+curl -X POST http://localhost:8081/api/orders/<orderId>/status \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "customerId": "user-1001",
+    "customerEmail": "user1001@example.com",
+    "previousStatus": 20,
+    "currentStatus": 25
+  }'
+```
+
+### 7.6 상품 생성 API 호출
+```bash
+curl -X POST http://localhost:8083/api/products \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "productName": "wireless-keyboard",
+    "price": 59900,
+    "currency": "KRW",
+    "stockQuantity": 120
+  }'
+```
+- 상품 이벤트 DLQ 토픽은 `product.created.v1.dlq`로 자동 생성됩니다.
+
+### 7.7 DLQ 테스트 (강제 실패)
 ```bash
 curl -X POST http://localhost:8081/api/orders \
   -H 'Content-Type: application/json' \

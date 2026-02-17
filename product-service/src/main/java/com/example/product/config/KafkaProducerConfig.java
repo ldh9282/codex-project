@@ -1,5 +1,6 @@
-package com.example.order.config;
+package com.example.product.config;
 
+import com.example.common.event.ProductCreatedEvent;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -19,7 +20,7 @@ import java.util.Map;
 public class KafkaProducerConfig {
 
     @Bean
-    public ProducerFactory<String, Object> producerFactory(@Value("${spring.kafka.bootstrap-servers}") String bootstrapServers) {
+    public ProducerFactory<String, ProductCreatedEvent> producerFactory(@Value("${spring.kafka.bootstrap-servers}") String bootstrapServers) {
         Map<String, Object> configs = new HashMap<>();
         configs.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         configs.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
@@ -32,13 +33,13 @@ public class KafkaProducerConfig {
     }
 
     @Bean
-    public KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> producerFactory) {
+    public KafkaTemplate<String, ProductCreatedEvent> kafkaTemplate(ProducerFactory<String, ProductCreatedEvent> producerFactory) {
         return new KafkaTemplate<>(producerFactory);
     }
 
     @Bean
-    public NewTopic orderCreatedTopic(
-            @Value("${app.kafka.topics.order-created}") String topic,
+    public NewTopic productCreatedTopic(
+            @Value("${app.kafka.topics.product-created}") String topic,
             @Value("${app.kafka.partitions}") int partitions,
             @Value("${app.kafka.replication-factor}") short replicationFactor
     ) {
@@ -49,14 +50,15 @@ public class KafkaProducerConfig {
     }
 
     @Bean
-    public NewTopic orderShippedTopic(
-            @Value("${app.kafka.topics.order-shipped}") String topic,
+    public NewTopic productCreatedDlqTopic(
+            @Value("${app.kafka.topics.product-created-dlq}") String dlqTopic,
             @Value("${app.kafka.partitions}") int partitions,
             @Value("${app.kafka.replication-factor}") short replicationFactor
     ) {
-        return TopicBuilder.name(topic)
+        return TopicBuilder.name(dlqTopic)
                 .partitions(partitions)
                 .replicas(replicationFactor)
                 .build();
     }
+
 }
