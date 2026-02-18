@@ -129,6 +129,7 @@ mvn clean package
 서비스를 각각 별도 터미널에서 실행:
 
 ```bash
+docker compose up -d zookeeper kafka redis
 mvn -pl order-service spring-boot:run
 mvn -pl notification-service spring-boot:run
 mvn -pl product-service spring-boot:run
