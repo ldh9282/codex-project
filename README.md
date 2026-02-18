@@ -106,6 +106,20 @@ docker scout cves order-service:latest
 snyk container test order-service:latest
 ```
 
+
+#### (참고) `no main manifest attribute, in /app/app.jar` 에러가 날 때
+
+- 원인: 서비스 모듈에서 실행 가능한 Spring Boot fat jar가 아닌 일반 jar가 이미지에 들어간 경우입니다.
+- 현재 프로젝트는 각 서비스 모듈(`order-service`, `notification-service`, `product-service`)에서
+  `spring-boot-maven-plugin`의 `repackage`를 실행하도록 설정되어 있어, compose 빌드 시 실행 가능한 jar를 생성합니다.
+
+재빌드 명령:
+
+```bash
+docker compose build --no-cache order-service notification-service product-service
+docker compose up -d
+```
+
 ### 6.2 Maven으로 로컬 실행 (기존 방식)
 
 ```bash
