@@ -31,6 +31,3 @@ app:
       order-shipped: order.shipped.v1
       order-shipped-dlq: order.shipped.v1.dlq
 
-logging:
-  file:
-    name: ${LOG_FILE_PATH:/var/log/app/application.log}
