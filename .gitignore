@@ -5,3 +5,5 @@
 # Maven/Java build output
 target/
 **/target/
+# Runtime logs
+logs/**/application.log
