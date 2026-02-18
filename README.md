@@ -82,6 +82,30 @@ docker compose up -d --build
 - 포함 대상: Zookeeper, Kafka, Redis, order-service, notification-service, product-service
 - 서비스는 컨테이너 내부 네트워크에서 `kafka:29092`, `redis:6379`로 연결됩니다.
 
+#### (참고) `docker scan` 에러가 날 때
+
+최근 Docker 환경에서는 `docker scan`이 기본 제공되지 않거나 비활성화되어,
+`Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them`
+유형의 안내/에러가 보일 수 있습니다.
+
+대신 아래 둘 중 하나를 사용하세요.
+
+1) **Docker Scout 사용(권장)**
+```bash
+# 이미지 빌드
+docker compose build
+
+# 취약점 확인 (예: order-service)
+docker scout quickview order-service:latest
+docker scout cves order-service:latest
+```
+
+2) **Snyk CLI 직접 사용**
+```bash
+# Snyk 설치 후 로그인 필요
+snyk container test order-service:latest
+```
+
 ### 6.2 Maven으로 로컬 실행 (기존 방식)
 
 ```bash
@@ -91,6 +115,22 @@ mvn clean package
 서비스를 각각 별도 터미널에서 실행:
 
 ```bash
+mvn -pl order-service spring-boot:run
+mvn -pl notification-service spring-boot:run
+mvn -pl product-service spring-boot:run
+```
+
+### 6.3 Dockerfile가 필요한 경우/필요 없는 경우
+
+- **필요함**: `docker compose`에서 `order-service`, `notification-service`, `product-service`를 **컨테이너 이미지로 빌드/실행**할 때
+  - 현재 compose는 `build:`를 사용하므로 `Dockerfile`이 필요합니다.
+- **불필요함**: 서비스를 로컬 JVM에서 `mvn spring-boot:run`으로만 실행할 때
+  - 이 경우 Dockerfile 없이도 실행 가능합니다.
+
+예: 인프라만 Docker로 올리고 앱은 로컬에서 실행하려면
+
+```bash
+docker compose up -d zookeeper kafka redis
 mvn -pl order-service spring-boot:run
 mvn -pl notification-service spring-boot:run
 mvn -pl product-service spring-boot:run
