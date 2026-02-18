@@ -57,7 +57,8 @@ Spring Boot 멀티 모듈 기반의 Kafka 이벤트 드리븐 예제 프로젝�
 ├─ order-service           # 주문 API + 주문 이벤트 발행
 ├─ product-service         # 상품 API + 상품 이벤트 발행
 ├─ notification-service    # 주문 이벤트 소비 + 알림 처리
-├─ docker-compose.yml      # Kafka, Zookeeper, Redis
+├─ docker-compose.yml      # Kafka, Zookeeper, Redis + Spring Boot 서비스
+├─ Dockerfile              # 공통 멀티스테이지 빌드 (서비스별 이미지 생성, 포트/버전 하드코딩 제거)
 └─ README.md
 ```
 
@@ -72,21 +73,64 @@ Spring Boot 멀티 모듈 기반의 Kafka 이벤트 드리븐 예제 프로젝�
 
 ## 6) 로컬 실행
 
-### 6.1 인프라 실행
+### 6.1 Docker Compose로 전체 실행 (권장)
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-### 6.2 빌드
+- 포함 대상: Zookeeper, Kafka, Redis, order-service, notification-service, product-service
+- 서비스는 컨테이너 내부 네트워크에서 `kafka:29092`, `redis:6379`로 연결됩니다.
+
+#### (참고) `docker scan` 에러가 날 때
+
+최근 Docker 환경에서는 `docker scan`이 기본 제공되지 않거나 비활성화되어,
+`Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them`
+유형의 안내/에러가 보일 수 있습니다.
+
+대신 아래 둘 중 하나를 사용하세요.
+
+1) **Docker Scout 사용(권장)**
+```bash
+# 이미지 빌드
+docker compose build
+
+# 취약점 확인 (예: order-service)
+docker scout quickview order-service:latest
+docker scout cves order-service:latest
+```
+
+2) **Snyk CLI 직접 사용**
+```bash
+# Snyk 설치 후 로그인 필요
+snyk container test order-service:latest
+```
+
+### 6.2 Maven으로 로컬 실행 (기존 방식)
 
 ```bash
 mvn clean package
 ```
 
-### 6.3 서비스 실행 (각각 별도 터미널)
+서비스를 각각 별도 터미널에서 실행:
 
 ```bash
+mvn -pl order-service spring-boot:run
+mvn -pl notification-service spring-boot:run
+mvn -pl product-service spring-boot:run
+```
+
+### 6.3 Dockerfile가 필요한 경우/필요 없는 경우
+
+- **필요함**: `docker compose`에서 `order-service`, `notification-service`, `product-service`를 **컨테이너 이미지로 빌드/실행**할 때
+  - 현재 compose는 `build:`를 사용하므로 `Dockerfile`이 필요합니다.
+- **불필요함**: 서비스를 로컬 JVM에서 `mvn spring-boot:run`으로만 실행할 때
+  - 이 경우 Dockerfile 없이도 실행 가능합니다.
+
+예: 인프라만 Docker로 올리고 앱은 로컬에서 실행하려면
+
+```bash
+docker compose up -d zookeeper kafka redis
 mvn -pl order-service spring-boot:run
 mvn -pl notification-service spring-boot:run
 mvn -pl product-service spring-boot:run
