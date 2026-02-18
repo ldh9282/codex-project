@@ -129,6 +129,7 @@ mvn clean package
 서비스를 각각 별도 터미널에서 실행:
 
 ```bash
+docker compose up -d zookeeper kafka redis
 mvn -pl order-service spring-boot:run
 mvn -pl notification-service spring-boot:run
 mvn -pl product-service spring-boot:run
@@ -149,6 +150,25 @@ mvn -pl order-service spring-boot:run
 mvn -pl notification-service spring-boot:run
 mvn -pl product-service spring-boot:run
 ```
+
+
+### 6.4 파일 로그 적재 + 서비스별 tail 스크립트
+
+Docker 실행 시 각 서비스 로그를 호스트 디렉터리(`./logs/...`)에 파일로 적재합니다.
+
+- `order-service` -> `logs/order-service/application.log`
+- `notification-service` -> `logs/notification-service/application.log`
+- `product-service` -> `logs/product-service/application.log`
+
+서비스별 tail 스크립트:
+
+```bash
+./scripts/tail-order-service-log.sh
+./scripts/tail-notification-service-log.sh
+./scripts/tail-product-service-log.sh
+```
+
+> 참고: 로그 파일이 아직 없으면 서비스 기동 후 다시 실행하세요.
 
 ## 7) API 예시
 
