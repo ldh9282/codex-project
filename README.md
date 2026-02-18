@@ -58,7 +58,7 @@ Spring Boot 멀티 모듈 기반의 Kafka 이벤트 드리븐 예제 프로젝�
 ├─ product-service         # 상품 API + 상품 이벤트 발행
 ├─ notification-service    # 주문 이벤트 소비 + 알림 처리
 ├─ docker-compose.yml      # Kafka, Zookeeper, Redis + Spring Boot 서비스
-├─ Dockerfile              # 공통 멀티스테이지 빌드 (서비스별 이미지 생성)
+├─ Dockerfile              # 공통 멀티스테이지 빌드 (서비스별 이미지 생성, 포트/버전 하드코딩 제거)
 └─ README.md
 ```
 

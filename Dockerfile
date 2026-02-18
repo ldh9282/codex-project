@@ -17,7 +17,14 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 ARG SERVICE_MODULE
-COPY --from=builder /build/${SERVICE_MODULE}/target/${SERVICE_MODULE}-1.0.0.jar app.jar
+ARG APP_PORT=8080
 
-EXPOSE 8080
+COPY --from=builder /build/${SERVICE_MODULE}/target/*.jar /tmp/
+RUN set -eux; \
+    jar_file="$(find /tmp -maxdepth 1 -type f -name '*.jar' ! -name '*.original' | head -n 1)"; \
+    test -n "$jar_file"; \
+    mv "$jar_file" /app/app.jar; \
+    rm -f /tmp/*.jar
+
+EXPOSE ${APP_PORT}
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
