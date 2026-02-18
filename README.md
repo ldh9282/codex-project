@@ -57,7 +57,8 @@ Spring Boot 멀티 모듈 기반의 Kafka 이벤트 드리븐 예제 프로젝�
 ├─ order-service           # 주문 API + 주문 이벤트 발행
 ├─ product-service         # 상품 API + 상품 이벤트 발행
 ├─ notification-service    # 주문 이벤트 소비 + 알림 처리
-├─ docker-compose.yml      # Kafka, Zookeeper, Redis
+├─ docker-compose.yml      # Kafka, Zookeeper, Redis + Spring Boot 서비스
+├─ Dockerfile              # 공통 멀티스테이지 빌드 (서비스별 이미지 생성)
 └─ README.md
 ```
 
@@ -72,19 +73,22 @@ Spring Boot 멀티 모듈 기반의 Kafka 이벤트 드리븐 예제 프로젝�
 
 ## 6) 로컬 실행
 
-### 6.1 인프라 실행
+### 6.1 Docker Compose로 전체 실행 (권장)
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-### 6.2 빌드
+- 포함 대상: Zookeeper, Kafka, Redis, order-service, notification-service, product-service
+- 서비스는 컨테이너 내부 네트워크에서 `kafka:29092`, `redis:6379`로 연결됩니다.
+
+### 6.2 Maven으로 로컬 실행 (기존 방식)
 
 ```bash
 mvn clean package
 ```
 
-### 6.3 서비스 실행 (각각 별도 터미널)
+서비스를 각각 별도 터미널에서 실행:
 
 ```bash
 mvn -pl order-service spring-boot:run
