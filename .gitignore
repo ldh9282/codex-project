@@ -6,4 +6,5 @@
 target/
 **/target/
 # Runtime logs
-logs/**/application.log
+logs/**/app.log
+logs/**/app.*.log

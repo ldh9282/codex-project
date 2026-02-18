@@ -155,10 +155,11 @@ mvn -pl product-service spring-boot:run
 ### 6.4 파일 로그 적재 + 서비스별 tail 스크립트
 
 Docker 실행 시 각 서비스 로그를 호스트 디렉터리(`./logs/...`)에 파일로 적재합니다.
+현재 로그 파일은 `app.log`이며, 날짜가 바뀌면 `app.yyyymmdd.log` 형식으로 일 단위 롤링됩니다.
 
-- `order-service` -> `logs/order-service/application.log`
-- `notification-service` -> `logs/notification-service/application.log`
-- `product-service` -> `logs/product-service/application.log`
+- `order-service` -> `logs/order-service/app.log`
+- `notification-service` -> `logs/notification-service/app.log`
+- `product-service` -> `logs/product-service/app.log`
 
 서비스별 tail 스크립트:
 

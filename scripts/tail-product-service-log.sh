@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-tail -n 200 -f logs/product-service/application.log
+LOG_FILE="logs/product-service/app.log"
+[ -f "$LOG_FILE" ] || { echo "log file not found: $LOG_FILE"; exit 1; }
+tail -n 200 -f "$LOG_FILE"
