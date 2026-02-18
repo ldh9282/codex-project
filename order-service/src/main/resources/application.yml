@@ -20,7 +20,3 @@ app:
     topics:
       order-created: order.created.v1
       order-shipped: order.shipped.v1
-
-logging:
-  file:
-    name: ${LOG_FILE_PATH:/var/log/app/application.log}

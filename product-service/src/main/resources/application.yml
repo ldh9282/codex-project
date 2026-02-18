@@ -20,7 +20,3 @@ app:
     topics:
       product-created: product.created.v1
       product-created-dlq: product.created.v1.dlq
-
-logging:
-  file:
-    name: ${LOG_FILE_PATH:/var/log/app/application.log}
