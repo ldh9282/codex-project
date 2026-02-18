@@ -1,175 +1,101 @@
-# Kafka Event-Driven MSA Portfolio (Order/Product → Notification)
+# Kafka Event-Driven MSA Portfolio
 
-실무형 설계를 목표로 만든 Spring Boot 기반 Kafka 이벤트 드리븐 프로젝트입니다.
+Spring Boot 멀티 모듈 기반의 Kafka 이벤트 드리븐 예제 프로젝트입니다.  
+핵심 시나리오는 **주문/상품 이벤트 발행**과 **주문 알림 소비(생성/배송 상태)** 입니다.
 
 ## 1) 프로젝트 개요
 
-이 프로젝트는 `order-service`와 `product-service`에서 각각 주문/상품 생성 이벤트를 Kafka로 발행하고,
-`notification-service`가 주문 생성 이벤트를 소비하여 알림을 전송하는 구조입니다.
+이 프로젝트는 3개의 서비스로 구성됩니다.
 
-핵심 포인트:
-- Producer/Consumer 분리 (서비스 책임 분리)
-- Consumer Group + Concurrency 기반 병렬 처리
-- Retry + DLQ(Dead Letter Queue)로 장애 메시지 격리
-- Redis 기반 Idempotency(중복 처리 방지)
-- 운영 추적에 필요한 로그/메타데이터(eventId, partition, offset) 출력
+- `order-service`
+  - 주문 생성 이벤트(`order.created.v1`) 발행
+  - 주문 상태 변경 이벤트(`order.shipped.v1`) 발행
+- `product-service`
+  - 상품 생성 이벤트(`product.created.v1`) 발행
+- `notification-service`
+  - 주문 생성/배송 이벤트 소비
+  - Redis 기반 idempotency 처리
+  - Retry + DLQ 처리
 
----
+## 2) 주요 특징
 
-## 2) 아키텍처 다이어그램 (텍스트)
+- **서비스 간 비동기 통신**: Kafka를 통해 서비스 결합도를 낮춤
+- **메시지 키 기반 파티셔닝**: `orderId`/`productId` 키 사용
+- **운영 친화적 에러 처리**: `DefaultErrorHandler + DeadLetterPublishingRecoverer`
+- **중복 처리 방지**: Redis `SETNX + TTL` 기반 idempotency
+- **추적 가능한 로그**: topic/partition/offset/eventId 중심 로깅
+
+## 3) 아키텍처 (텍스트)
 
 ```text
 [Client]
-   |
-   | POST /api/orders
+   | POST /api/orders, /api/orders/{orderId}/status, /api/products
    v
-[order-service]
-   | 1) 주문 생성
-   | 2) OrderCreatedEvent / OrderShippedEvent 발행 (topic: order.created.v1)
-   v
-[Kafka Broker]  --- partition(0..2)
-   |
-   | consumer group: notification-consumer-group (concurrency=3)
-   v
-[notification-service]
-   | 1) eventId 기반 Redis SETNX (idempotency)
-   | 2) 알림 전송
-   | 3) 실패 시 retry(3회) -> DLQ(topic: order.created.v1.dlq)
-   v
-[DLQ Consumer]
-   | 운영 알람/재처리 연계 포인트
-   v
-[Ops / Alerting / Reprocessor]
+[order-service] ----------------------> order.created.v1 / order.shipped.v1
+[product-service] --------------------> product.created.v1
+                    (Kafka Broker)
+                          |
+                          | consumer group: notification-consumer-group
+                          v
+                 [notification-service]
+                   - consume order.created.v1
+                   - consume order.shipped.v1
+                   - idempotency (Redis)
+                   - retry 3회 후 DLQ 전송
+                          |
+                          +--> order.created.v1.dlq
+                          +--> order.shipped.v1.dlq
 ```
 
----
+> 참고: `product.created.v1.dlq` 토픽은 현재 `product-service`에서 토픽 생성용으로 정의되어 있으며, 본 프로젝트 내 소비자는 구현되어 있지 않습니다.
 
-## 3) 전체 프로젝트 구조
+## 4) 모듈 구조
 
 ```text
-kafka-msa-portfolio/
-├─ pom.xml
-├─ docker-compose.yml
-├─ README.md
-├─ common/
-│  ├─ pom.xml
-│  └─ src/main/java/com/example/common/
-│     ├─ event/OrderCreatedEvent.java
-│     ├─ event/OrderShippedEvent.java
-│     ├─ event/ProductCreatedEvent.java
-│     └─ serde/KafkaEventSerDe.java
-├─ order-service/
-│  ├─ pom.xml
-│  └─ src/main/
-│     ├─ java/com/example/order/
-│     │  ├─ OrderServiceApplication.java
-│     │  ├─ config/KafkaProducerConfig.java
-│     │  ├─ controller/OrderController.java
-│     │  ├─ controller/GlobalExceptionHandler.java
-│     │  ├─ dto/CreateOrderRequest.java
-│     │  ├─ dto/CreateOrderResponse.java
-│     │  ├─ producer/OrderEventProducer.java
-│     │  └─ service/OrderService.java
-│     └─ resources/application.yml
-├─ product-service/
-│  ├─ pom.xml
-│  └─ src/main/
-│     ├─ java/com/example/product/
-│     │  ├─ ProductServiceApplication.java
-│     │  ├─ config/KafkaProducerConfig.java
-│     │  ├─ controller/ProductController.java
-│     │  ├─ controller/GlobalExceptionHandler.java
-│     │  ├─ dto/CreateProductRequest.java
-│     │  ├─ dto/CreateProductResponse.java
-│     │  ├─ producer/ProductEventProducer.java
-│     │  └─ service/ProductService.java
-│     └─ resources/application.yml
-└─ notification-service/
-   ├─ pom.xml
-   └─ src/main/
-      ├─ java/com/example/notification/
-      │  ├─ NotificationServiceApplication.java
-      │  ├─ config/KafkaConsumerConfig.java
-      │  ├─ config/KafkaTemplateConfig.java
-      │  ├─ consumer/OrderEventConsumer.java
-      │  ├─ consumer/OrderEventDlqConsumer.java
-      │  ├─ domain/NotificationStatus.java
-      │  ├─ dto/NotificationResult.java
-      │  ├─ repository/ProcessedEventRepository.java
-      │  └─ service/
-      │     ├─ NotificationSender.java
-      │     └─ NotificationService.java
-      └─ resources/application.yml
+.
+├─ common                  # 이벤트 DTO / 공통 SerDe
+├─ order-service           # 주문 API + 주문 이벤트 발행
+├─ product-service         # 상품 API + 상품 이벤트 발행
+├─ notification-service    # 주문 이벤트 소비 + 알림 처리
+├─ docker-compose.yml      # Kafka, Zookeeper, Redis
+└─ README.md
 ```
 
----
+## 5) 토픽
 
-## 4) Kafka를 선택한 이유
+- `order.created.v1`
+- `order.created.v1.dlq`
+- `order.shipped.v1`
+- `order.shipped.v1.dlq`
+- `product.created.v1`
+- `product.created.v1.dlq` (현재 소비자 없음)
 
-1. **서비스 간 강결합 완화**
-   - 주문 서비스는 알림 서비스의 상태를 몰라도 이벤트만 발행하면 됩니다.
-2. **확장성**
-   - 동일 이벤트를 다른 소비자(정산/통계/추천)로 손쉽게 확장할 수 있습니다.
-3. **내고장성**
-   - 소비자 장애 시에도 이벤트는 브로커에 유지되며 재처리가 가능합니다.
-4. **운영성**
-   - offset, partition, consumer lag 관측이 가능해 운영 가시성이 좋습니다.
+## 6) 로컬 실행
 
----
+### 6.1 인프라 실행
 
-## 5) DLQ 및 장애 대응 전략
-
-### Retry
-- `DefaultErrorHandler + FixedBackOff(2000ms, 3회)` 사용.
-- 일시적 장애(외부 API timeout 등)에서 자동 회복 기회를 제공.
-
-### DLQ
-- 재시도 후 실패한 메시지는 `order.created.v1.dlq` (주문생성), `order.shipped.v1.dlq` (주문배송), `product.created.v1.dlq` (상품) 토픽으로 이동.
-- DLQ 컨슈머에서 장애 메시지 로깅 후 운영 알람/재처리 시스템으로 연결 가능.
-
-### 왜 필요한가?
-- 무한 재시도는 파티션 처리를 막고 지연을 누적시킵니다.
-- 실패 메시지를 격리해야 정상 메시지 흐름을 보호할 수 있습니다.
-
----
-
-## 6) Idempotency(중복 처리) 전략
-
-- Kafka는 기본적으로 at-least-once 전달이므로 중복 소비가 가능.
-- `eventId`를 키로 Redis `SETNX + TTL(7일)` 저장.
-- 이미 처리된 eventId는 즉시 `DUPLICATE`로 스킵.
-
-장점:
-- 멀티 인스턴스 환경에서도 원자적으로 중복 방지 가능.
-- TTL로 저장소 무한 증가 방지.
-
----
-
-## 7) 로컬 실행 방법
-
-### 7.1 인프라 기동
 ```bash
 docker compose up -d
 ```
 
-### 7.2 빌드
+### 6.2 빌드
+
 ```bash
 mvn clean package
 ```
 
-### 7.3 서비스 실행
+### 6.3 서비스 실행 (각각 별도 터미널)
+
 ```bash
-# 터미널 1
 mvn -pl order-service spring-boot:run
-
-# 터미널 2
-mvn -pl product-service spring-boot:run
-
-# 터미널 3
 mvn -pl notification-service spring-boot:run
+mvn -pl product-service spring-boot:run
 ```
 
-### 7.4 주문 생성 API 호출
+## 7) API 예시
+
+### 7.1 주문 생성
+
 ```bash
 curl -X POST http://localhost:8081/api/orders \
   -H 'Content-Type: application/json' \
@@ -181,7 +107,12 @@ curl -X POST http://localhost:8081/api/orders \
   }'
 ```
 
-### 7.5 주문 상태 변경 API 호출
+### 7.2 주문 상태 변경
+
+허용 전이:
+- `20 -> 25`
+- `25 -> 80`
+
 ```bash
 curl -X POST http://localhost:8081/api/orders/<orderId>/status \
   -H 'Content-Type: application/json' \
@@ -193,7 +124,8 @@ curl -X POST http://localhost:8081/api/orders/<orderId>/status \
   }'
 ```
 
-### 7.6 상품 생성 API 호출
+### 7.3 상품 생성
+
 ```bash
 curl -X POST http://localhost:8083/api/products \
   -H 'Content-Type: application/json' \
@@ -204,9 +136,25 @@ curl -X POST http://localhost:8083/api/products \
     "stockQuantity": 120
   }'
 ```
-- 상품 이벤트 DLQ 토픽은 `product.created.v1.dlq`로 자동 생성됩니다.
 
-### 7.7 DLQ 테스트 (강제 실패)
+## 8) 장애/중복 처리 전략
+
+### Retry + DLQ
+
+- `notification-service`에서 주문 이벤트 소비 실패 시
+  - `FixedBackOff(2000ms, 3회)` 재시도
+  - 이후 각 DLQ 토픽으로 이동
+
+### Idempotency
+
+- `eventId` 기준 Redis 예약(`SETNX`) 성공 시에만 처리
+- 이미 처리된 이벤트면 `DUPLICATE`로 스킵
+- 처리 실패 시 예약 키를 해제하여 재처리 가능하게 보장
+
+## 9) 테스트용 실패 시나리오
+
+`customerId`를 `fail-` prefix로 전달하면 `notification-service`의 전송 로직에서 예외를 발생시켜 retry/DLQ 흐름을 확인할 수 있습니다.
+
 ```bash
 curl -X POST http://localhost:8081/api/orders \
   -H 'Content-Type: application/json' \
@@ -217,46 +165,9 @@ curl -X POST http://localhost:8081/api/orders \
     "currency": "KRW"
   }'
 ```
-- `customerId`가 `fail-`로 시작하면 notification 전송 로직이 예외를 던져 retry 후 DLQ로 이동합니다.
 
----
+## 10) 다음 개선 아이디어
 
-## 8) 트러블슈팅 예시
-
-### 문제 1) Consumer가 메시지를 못 읽음
-- 점검:
-  - `spring.kafka.bootstrap-servers` 값
-  - 토픽 존재 여부 및 파티션 수
-  - consumer group lag
-
-### 문제 2) DLQ에 메시지가 누적됨
-- 점검:
-  - 하위 시스템(메일/SMS) 장애 여부
-  - 예외 타입별 분류(재시도 가능/불가)
-  - retry 횟수/백오프 값 적정성
-
-### 문제 3) 중복 알림 발송
-- 점검:
-  - Redis 연결 상태
-  - eventId 생성 규칙(전역 유일성)
-  - idempotency TTL 정책이 너무 짧지 않은지
-
----
-
-## 9) 면접 어필 포인트 (핵심 5가지)
-
-1. **Kafka 실패 처리 체계(Retry + DLQ)를 코드 레벨로 구현**
-2. **at-least-once를 고려한 Redis 기반 Idempotency 설계**
-3. **Consumer Group + Concurrency로 병렬 처리 및 확장성 확보**
-4. **토픽 키 전략(orderId key)으로 파티션 순서 보장 고려**
-5. **운영 관점 로그(eventId/partition/offset)와 장애 재현 시나리오 포함**
-
----
-
-## 10) 다음 고도화 제안
-
-- Order DB + Outbox Pattern + CDC(Debezium) 도입
-- Schema Registry(Avro/Protobuf)로 이벤트 스키마 버전 관리
-- DLQ 재처리 워커와 운영용 대시보드 구축
-- Testcontainers 기반 통합 테스트 자동화
-
+- Outbox Pattern + CDC(Debezium)
+- Schema Registry(Avro/Protobuf)
+- DLQ 재처리 워커 + 운영 대시보드
