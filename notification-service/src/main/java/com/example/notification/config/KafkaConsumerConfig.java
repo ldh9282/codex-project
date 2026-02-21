@@ -2,6 +2,7 @@ package com.example.notification.config;
 
 import com.example.common.event.OrderCreatedEvent;
 import com.example.common.event.OrderShippedEvent;
+import com.example.common.event.ProductCreatedEvent;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.TopicPartition;
@@ -52,6 +53,17 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
+    public ConsumerFactory<String, ProductCreatedEvent> productCreatedConsumerFactory(
+            @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
+            @Value("${spring.kafka.consumer.group-id}") String groupId
+    ) {
+        JsonDeserializer<ProductCreatedEvent> jsonDeserializer = new JsonDeserializer<>(ProductCreatedEvent.class);
+        jsonDeserializer.addTrustedPackages("com.example.common.event");
+        jsonDeserializer.setUseTypeMapperForKey(false);
+        return new DefaultKafkaConsumerFactory<>(consumerConfigs(bootstrapServers, groupId), new StringDeserializer(), jsonDeserializer);
+    }
+
+    @Bean
     public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> orderKafkaListenerContainerFactory(
             ConsumerFactory<String, OrderCreatedEvent> orderCreatedConsumerFactory,
             KafkaTemplate<String, Object> kafkaTemplate,
@@ -76,6 +88,18 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ProductCreatedEvent> productCreatedKafkaListenerContainerFactory(
+            ConsumerFactory<String, ProductCreatedEvent> productCreatedConsumerFactory,
+            KafkaTemplate<String, Object> kafkaTemplate,
+            @Value("${app.kafka.topics.product-created-dlq}") String dlqTopic
+    ) {
+        ConcurrentKafkaListenerContainerFactory<String, ProductCreatedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(productCreatedConsumerFactory);
+        factory.setCommonErrorHandler(errorHandler(kafkaTemplate, dlqTopic));
+        return factory;
+    }
+
+    @Bean
     public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> dlqKafkaListenerContainerFactory(
             ConsumerFactory<String, OrderCreatedEvent> orderCreatedConsumerFactory
     ) {
@@ -90,6 +114,15 @@ public class KafkaConsumerConfig {
     ) {
         ConcurrentKafkaListenerContainerFactory<String, OrderShippedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(orderShippedConsumerFactory);
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ProductCreatedEvent> productCreatedDlqKafkaListenerContainerFactory(
+            ConsumerFactory<String, ProductCreatedEvent> productCreatedConsumerFactory
+    ) {
+        ConcurrentKafkaListenerContainerFactory<String, ProductCreatedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(productCreatedConsumerFactory);
         return factory;
     }
 
@@ -123,6 +156,24 @@ public class KafkaConsumerConfig {
     @Bean
     public NewTopic orderShippedDlqTopic(
             @Value("${app.kafka.topics.order-shipped-dlq}") String topic,
+            @Value("${app.kafka.partitions}") int partitions,
+            @Value("${app.kafka.replication-factor}") short replicationFactor
+    ) {
+        return TopicBuilder.name(topic).partitions(partitions).replicas(replicationFactor).build();
+    }
+
+    @Bean
+    public NewTopic productCreatedTopic(
+            @Value("${app.kafka.topics.product-created}") String topic,
+            @Value("${app.kafka.partitions}") int partitions,
+            @Value("${app.kafka.replication-factor}") short replicationFactor
+    ) {
+        return TopicBuilder.name(topic).partitions(partitions).replicas(replicationFactor).build();
+    }
+
+    @Bean
+    public NewTopic productCreatedDlqTopic(
+            @Value("${app.kafka.topics.product-created-dlq}") String topic,
             @Value("${app.kafka.partitions}") int partitions,
             @Value("${app.kafka.replication-factor}") short replicationFactor
     ) {
