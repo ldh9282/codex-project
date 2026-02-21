@@ -30,4 +30,5 @@ app:
       order-created-dlq: order.created.v1.dlq
       order-shipped: order.shipped.v1
       order-shipped-dlq: order.shipped.v1.dlq
-
+      product-created: product.created.v1
+      product-created-dlq: product.created.v1.dlq
